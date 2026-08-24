@@ -49,9 +49,8 @@ transmit() {
 
 bool
 receive() {
-  /* Drop if read not ok, not from ground control, or not 8 chars long */
+  /* Drop if read not ok or not 8 chars long */
   if (can_controller.readMessage(&rx) != MCP2515::ERROR_OK) return false;
-  if (rx.can_id != GROUND_CONTROL_CAN_ID) return false;
   if (rx.can_dlc != sizeof(rx.data)) return false;
 
   for (int i = 0; i < rx.can_dlc; i++)
@@ -108,11 +107,16 @@ performRequest(char method, char param, channel_t *channel, int *rel_val)
 
 void setup(void)
 {
-    /* Set each curent pin as input, each state pin as output */ 
+    /* Set each current pin as input, each state pin as output
+     * and set each channel state to 0 (off) */ 
     for (int i = 0; i < NUM_CHANNELS; i++)
     {
       pinMode(CHANNELS[i].current_pin, INPUT);
       pinMode(CHANNELS[i].state_pin, OUTPUT);
+
+      /* Set state pin low */
+      digitalWrite(CHANNELS[i].state_pin, 0); 
+      CHANNELS[i].state = 0;
     }
 
     can_controller.reset();
@@ -156,6 +160,9 @@ void loop(void)
         /* For a set command, try get new rel_val*/
         if (*l_method == 'S')
         {
+            /* Drop set requests that aren't from ground control */
+            if (rx.can_id != GROUND_CONTROL_CAN_ID) return;
+
             l_rel_val = atoi(l_str_rel_val);
             /* If none or a non-integer value was sent, drop */
             if (*l_str_rel_val != '0' && l_rel_val == 0) return;
