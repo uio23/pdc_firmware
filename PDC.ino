@@ -5,19 +5,21 @@
 
 
 MCP2515 can_controller(SPI_CS_PIN);
+HardwareTimer timer(TIM1);
 
 struct can_frame tx, rx;
  /* Extra char for \0 */
 char tx_string[sizeof(tx.data) + 1] = {' '};
 char rx_string[sizeof(rx.data) + 1] = {' '};
 
-/* Vars used in loop, to avoid re-allocating memory */
-int l_i;
-char *l_method, *l_name, *l_param;
-char *l_str_val;
-int l_val;
-channel_t *l_channel;
-battery_t *l_battery;
+volatile bool broadcast = false;
+
+
+void set_broadcast()
+{
+  digitalWrite(PC13, !digitalRead(PC13));
+  broadcast = true;
+}
 
 bool
 transmit() {
@@ -72,36 +74,57 @@ get_battery(char *battery_name)
   return NULL;
 }
 
-/**
- * Perform action on a channel, either getting or setting a value.
- * Will return false for an undefined \c method and \c param pair.
- */
 bool
-channel_request(char method, char param, channel_t *channel, int *val)
+handle_request()
 {
+  channel_t *channel;
+  battery_t *battery;
 
-  switch (method)
+  char *method  = strtok(rx_string, " ");
+  char *name    = strtok(NULL, " ");
+  char *param   = strtok(NULL, " ");
+  char *str_val = strtok(NULL, " ");
+  int  val      = -1;
+
+  /* If missing any of 3 essential parameters, drop */
+  if (method == NULL || name == NULL || param == NULL) return false;
+
+  if (*method == 'S')
   {
-    case 'G':
-      switch (param)
-      {
-        case 'S':
-          *val = digitalRead(channel->state_pin);
-          return true;
-      }
-      break;
+    /* Drop set requests that aren't from ground control */
+    if (rx.can_id != GROUND_CONTROL_CAN_ID) return false;
 
-    case 'S':
-      switch (param)
-      {
-        case 'S': 
-          digitalWrite(channel->state_pin, *val); 
-          return true;
-      }
-      break;
+    /* If no value or a non-integer value was sent, drop */
+    val = atoi(str_val);
+    if (*str_val != '0' && val == 0) return false;
   }
 
-  return false;
+  channel = get_channel(name);
+  battery = get_battery(name);
+
+  if (channel != NULL && *method == 'G' && *param == 'S')
+  {
+    val = digitalRead(channel->state_pin);
+  }
+  else if (channel != NULL && *method == 'S' && *param == 'S')
+  {
+    /* If new state is not 0 or 1, drop */
+    if (val != 0 && val != 1) return false;
+    digitalWrite(channel->state_pin, val);
+  }
+  else if (battery != NULL && *method == 'G' && *param == 'V')
+  {
+    val = VOLTAGE(analogRead(battery->voltage_pin));
+    /* Report voltage in tens of volts */
+    val = val * 10;
+  }
+  else
+  {
+    return false;
+  }
+
+  snprintf(tx_string, sizeof(tx_string), "%s %c %03d", name, *param, val); 
+  return true;
 }
 
 void setup(void)
@@ -112,7 +135,7 @@ void setup(void)
       pinMode(CHANNELS[i].state_pin, OUTPUT);
 
       /* Turn off channel */
-      digitalWrite(CHANNELS[i].state_pin, 0); 
+      digitalWrite(CHANNELS[i].state_pin, 0);
       CHANNELS[i].state = 0;
     }
 
@@ -125,58 +148,57 @@ void setup(void)
       BATTERIES[i].voltage = 0;
     }
 
+    /* LED flashes every broadcast */
+    pinMode(PC13, OUTPUT);
+
     can_controller.reset();
     can_controller.setBitrate(CAN_125KBPS);
     can_controller.setNormalOneShotMode(); /* Do not require acks */
+
+    /* Broadcast data every 200ms */
+    timer.pause();
+    timer.setOverflow(BROADCAST_INTERVAL, MICROSEC_FORMAT);
+    timer.attachInterrupt(set_broadcast);
+    timer.refresh();
+    timer.resume();
 }
 
 void loop(void)
 {
-    if (receive())
+  if (receive())
+  {
+    if (handle_request())
     {
-        l_method  = strtok(rx_string, " ");
-        l_name    = strtok(NULL, " ");
-        l_param   = strtok(NULL, " ");
-        l_str_val = strtok(NULL, " ");
-        l_val     = -1;
-
-        /* If missing any of 3 essential parameters, drop */
-        if (l_method == NULL || l_name == NULL || l_param == NULL) return;
-
-        if (*l_method == 'S')
-        {
-          /* Drop set requests that aren't from ground control */
-          if (rx.can_id != GROUND_CONTROL_CAN_ID) return;
-
-          /* If no value or a non-integer value was sent, drop */
-          l_val = atoi(l_str_val);
-          if (*l_str_val != '0' && l_val == 0) return;
-        }
-
-        l_channel = get_channel(l_name);
-        l_battery = get_battery(l_name);
-
-        if (l_channel != NULL && *l_method == 'G' && *l_param == 'S')
-        {
-          l_val = digitalRead(l_channel->state_pin);
-        }
-        else if (l_channel != NULL && *l_method == 'S' && *l_param == 'S')
-        {
-          /* If new state is not 0 or 1, drop */
-          if (l_val != 0 && l_val != 1) return;
-          digitalWrite(l_channel->state_pin, l_val);
-        }
-        else if (l_battery != NULL && *l_method == 'G' && *l_param == 'V')
-        {
-          l_val = VOLTAGE(analogRead(l_battery->voltage_pin));
-        }
-        else
-        {
-          /* Drop any other not supported requests */
-          return;
-        }
-
-        snprintf(tx_string, sizeof(tx_string), "%s %c %03d", l_name, *l_param, l_val); 
-        transmit();
+      transmit();
     }
+  }
+
+  if (broadcast)
+  {
+    /* Broadcast channel states as one CAN frame */
+    strcpy(tx_string, "S:");
+    for (int i = 0; i < ARRAY_SIZE(CHANNELS); i++)
+    {
+      /* Each state added as a bit */
+      tx_string[i + 2] = '0' + digitalRead(CHANNELS[i].state_pin);
+    }
+    transmit();
+
+    /* Broadcast battery voltages as one CAN frame */
+    strcpy(tx_string, "V:");
+    int voltage;
+    for (int i = 0; i < ARRAY_SIZE(BATTERIES); i++)
+    {
+      /* Each voltage added as a string in the range of 000 - 999 */
+      voltage = VOLTAGE(analogRead(BATTERIES[i].voltage_pin));
+      /* Report voltage in tens of volts */
+      voltage = voltage * 10;
+      tx_string[i * 3 + 2] = '0' + (voltage / 100) % 10;
+      tx_string[i * 3 + 3] = '0' + (voltage / 10 ) % 10;
+      tx_string[i * 3 + 4] = '0' + (voltage      ) % 10;
+    }
+    transmit();
+
+    broadcast = false;
+  }
 }

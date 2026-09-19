@@ -15,11 +15,13 @@
 #define PDC_CAN_ID            (0xDC) /* For (P)DC */
 #define GROUND_CONTROL_CAN_ID (0x01)
 #define SPI_CS_PIN            (PA0)
+
+#define BROADCAST_INTERVAL    (200000) /* 200 milliseconds in microseconds */
+
 #define ADC_MAX               (4095)
+#define VOLTAGE(x)            (( (float)x / ADC_MAX ) * 18.3f)
 
 #define ARRAY_SIZE(x)         (sizeof(x) / sizeof((x)[0]))
-#define VOLTAGE(x)            (x / ADC_MAX)
-
 
 
 /**
