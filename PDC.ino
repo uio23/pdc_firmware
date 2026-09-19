@@ -4,19 +4,6 @@
 #include "PDC.h"
 
 
-/* Variables for Logic Solutions */
-/* Current from pa7, pa6, pa5 */
-float pb14, pa15, pb3;
-/* State pins*/
-float state_pb14, state_pa15, state_pb3;
-
-/* Current from pa4, pb1, pb0 */
-float pa8, pa9, pa10;
-/* State pins */
-float state_pa8, state_pa9, state_pa10;
-/* ***************************** */
-
-
 MCP2515 can_controller(SPI_CS_PIN);
 
 struct can_frame tx, rx;
@@ -26,10 +13,11 @@ char rx_string[sizeof(rx.data) + 1] = {' '};
 
 /* Vars used in loop, to avoid re-allocating memory */
 int l_i;
-char *l_method, *l_channel_name, *l_param;
-char *l_str_rel_val;
-int l_rel_val;
+char *l_method, *l_name, *l_param;
+char *l_str_val;
+int l_val;
 channel_t *l_channel;
+battery_t *l_battery;
 
 bool
 transmit() {
@@ -63,9 +51,9 @@ receive() {
 }
 
 channel_t *
-getChannel(char *channel_name)
+get_channel(char *channel_name)
 {
-  for (int i = 0; i < NUM_CHANNELS; i++)
+  for (int i = 0; i < ARRAY_SIZE(CHANNELS); i++)
   {
     if (strcmp(CHANNELS[i].name, channel_name) == 0) return &CHANNELS[i];
   }
@@ -73,17 +61,33 @@ getChannel(char *channel_name)
   return NULL;
 }
 
-bool
-performRequest(char method, char param, channel_t *channel, int *rel_val)
+battery_t *
+get_battery(char *battery_name)
 {
+  for (int i = 0; i < ARRAY_SIZE(BATTERIES); i++)
+  {
+    if (strcmp(BATTERIES[i].name, battery_name) == 0) return &BATTERIES[i];
+  }
+
+  return NULL;
+}
+
+/**
+ * Perform action on a channel, either getting or setting a value.
+ * Will return false for an undefined \c method and \c param pair.
+ */
+bool
+channel_request(char method, char param, channel_t *channel, int *val)
+{
+
   switch (method)
   {
     case 'G':
       switch (param)
       {
-        case 'C': *rel_val = channel->current; break;
-        case 'S': *rel_val = channel->state;   break;
-        default:  return false;
+        case 'S':
+          *val = digitalRead(channel->state_pin);
+          return true;
       }
       break;
 
@@ -91,32 +95,34 @@ performRequest(char method, char param, channel_t *channel, int *rel_val)
       switch (param)
       {
         case 'S': 
-          digitalWrite(channel->state_pin, *rel_val); 
-          channel->state = *rel_val;
-          break;
-        default: return false;
+          digitalWrite(channel->state_pin, *val); 
+          return true;
       }
       break;
-
-    default:
-      return false;
   }
 
-  return true;
+  return false;
 }
 
 void setup(void)
 {
-    /* Set each current pin as input, each state pin as output
-     * and set each channel state to 0 (off) */ 
-    for (int i = 0; i < NUM_CHANNELS; i++)
+    /* Set each channel state pin as output and each channel state to 0 (off) */ 
+    for (int i = 0; i < ARRAY_SIZE(CHANNELS); i++)
     {
-      pinMode(CHANNELS[i].current_pin, INPUT);
       pinMode(CHANNELS[i].state_pin, OUTPUT);
 
-      /* Set state pin low */
+      /* Turn off channel */
       digitalWrite(CHANNELS[i].state_pin, 0); 
       CHANNELS[i].state = 0;
+    }
+
+    /* TODO: When E-Fuses are supported by hardware, include them */
+
+    /* Set each battery voltage pin to input and initialise voltage to 0 */
+    for (int i = 0; i < ARRAY_SIZE(BATTERIES); i++)
+    {
+      pinMode(BATTERIES[i].voltage_pin, INPUT);
+      BATTERIES[i].voltage = 0;
     }
 
     can_controller.reset();
@@ -126,77 +132,51 @@ void setup(void)
 
 void loop(void)
 {
-    /* TODO enable once hardward supports this */
-    /* Update current reading from each channel,
-     * and switch channel off if it's drawing too much current */
-#if 0
-    for (l_i = 0; l_i < NUM_CHANNELS; l_i++)
-    {
-        l_channel = &CHANNELS[l_i];
-        l_channel->current = analogRead(l_channel->current_pin);
-
-        if (l_channel->current > l_channel->c_max)
-        { 
-            digitalWrite(l_channel->state_pin, 0);
-            l_channel->state = 0;
-
-            snprintf(tx_string, sizeof(tx_string), "A %s S 0", l_channel->name); 
-            transmit();
-        }
-    }
-#endif
-
     if (receive())
     {
-        l_method = strtok(rx_string, " ");
-        l_channel_name = strtok(NULL, " ");
-        l_param = strtok(NULL, " ");
-        l_str_rel_val = strtok(NULL, " ");
-        l_rel_val = 0;
-        l_channel = NULL;
+        l_method  = strtok(rx_string, " ");
+        l_name    = strtok(NULL, " ");
+        l_param   = strtok(NULL, " ");
+        l_str_val = strtok(NULL, " ");
+        l_val     = -1;
 
         /* If missing any of 3 essential parameters, drop */
-        if (l_method == NULL || l_channel_name == NULL || l_param == NULL) return;
-        /* For a set command, try get new rel_val*/
+        if (l_method == NULL || l_name == NULL || l_param == NULL) return;
+
         if (*l_method == 'S')
         {
-            /* Drop set requests that aren't from ground control */
-            if (rx.can_id != GROUND_CONTROL_CAN_ID) return;
+          /* Drop set requests that aren't from ground control */
+          if (rx.can_id != GROUND_CONTROL_CAN_ID) return;
 
-            l_rel_val = atoi(l_str_rel_val);
-            /* If none or a non-integer value was sent, drop */
-            if (*l_str_rel_val != '0' && l_rel_val == 0) return;
-            /* If new state is not 0 or 1, drop */
-            if (l_rel_val != 0 && l_rel_val != 1) return;
+          /* If no value or a non-integer value was sent, drop */
+          l_val = atoi(l_str_val);
+          if (*l_str_val != '0' && l_val == 0) return;
         }
-        /* If a non-existing channel was named, drop */
-        l_channel = getChannel(l_channel_name);
-        if (l_channel == NULL) return;
 
-        /* Will fail for undefined methods/params,
-         * and also for setting current */
-        if (performRequest(*l_method, *l_param, l_channel, &l_rel_val))
+        l_channel = get_channel(l_name);
+        l_battery = get_battery(l_name);
+
+        if (l_channel != NULL && *l_method == 'G' && *l_param == 'S')
         {
-            snprintf(tx_string, sizeof(tx_string), "%s %c %d", l_channel_name, *l_param, l_rel_val); 
-            transmit();
+          l_val = digitalRead(l_channel->state_pin);
         }
+        else if (l_channel != NULL && *l_method == 'S' && *l_param == 'S')
+        {
+          /* If new state is not 0 or 1, drop */
+          if (l_val != 0 && l_val != 1) return;
+          digitalWrite(l_channel->state_pin, l_val);
+        }
+        else if (l_battery != NULL && *l_method == 'G' && *l_param == 'V')
+        {
+          l_val = VOLTAGE(analogRead(l_battery->voltage_pin));
+        }
+        else
+        {
+          /* Drop any other not supported requests */
+          return;
+        }
+
+        snprintf(tx_string, sizeof(tx_string), "%s %c %03d", l_name, *l_param, l_val); 
+        transmit();
     }
-
-    /* Set variables for Logic Solutions */
-    pb14 = CHANNELS[0].current;
-    pa15 = CHANNELS[1].current;
-    pb3 = CHANNELS[2].current;
-
-    state_pb14 = CHANNELS[0].state;
-    state_pa15 = CHANNELS[1].state;
-    state_pb3  = CHANNELS[2].state;
-
-    pa8 = CHANNELS[3].current;
-    pa9 = CHANNELS[4].current;
-    pa10 = CHANNELS[5].current;
-
-    state_pa8 = CHANNELS[3].state;
-    state_pa9 = CHANNELS[4].state;
-    state_pa10  = CHANNELS[5].state;
-    /* ********************************* */
 }

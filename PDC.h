@@ -3,7 +3,7 @@
  *         monitoring and controlling onboard power channels.
  * Created by Alexander Kashpir,
  * for the Univeristy of Waikato Aeronautics Club,
- * on a microcontroller by Elven Aerospace Industrices Ltd.
+ * on a microcontroller by Elven Aerospace Industrices Ltd and Gareth Reid.
  *
  */
 #include <cstdint>
@@ -15,29 +15,62 @@
 #define PDC_CAN_ID            (0xDC) /* For (P)DC */
 #define GROUND_CONTROL_CAN_ID (0x01)
 #define SPI_CS_PIN            (PA0)
-#define NUM_CHANNELS          (6)
+#define ADC_MAX               (4095)
+
+#define ARRAY_SIZE(x)         (sizeof(x) / sizeof((x)[0]))
+#define VOLTAGE(x)            (x / ADC_MAX)
 
 
-/*
+
+/**
  * A channel controlled by the PDC
  */
 typedef struct channel_t {
   char name[3];
-  float current;
-  float c_max;
-  uint32_t current_pin;
+
   int state;
   uint32_t state_pin;
 } channel_t;
 
+/**
+ * An E-Fuse controlling multiple channels
+ */
+typedef struct efuse_t {
+  char name[3];
 
-channel_t CHANNELS[NUM_CHANNELS] = {
-    /* High current channels */
-    {"H1", 0, 40, PA7, 0, PB14},
-    {"H2", 0, 20, PA6, 0, PA15},
-    {"H3", 0, 20, PA5, 0, PB3},
-    /* Low current channels */
-    {"L1", 0, 10, PA4, 0, PA8},
-    {"L2", 0, 10, PB1, 0, PA9},
-    {"L3", 0, 10, PB0, 0, PA10}
+  float current;
+  uint32_t current_pin;
+
+  int state;
+  uint32_t state_pin;
+} efuse_t;
+
+/**
+ * A battery supplying the PDC
+ */
+typedef struct battery_t {
+    char name[3];
+
+    float voltage;
+    uint32_t voltage_pin;
+} battery_t;
+
+
+channel_t CHANNELS[] = {
+    {"C1", 0, PB3 },
+    {"C2", 0, PA15},
+    {"C3", 0, PA10},
+    {"C4", 0, PA8 },
+    {"C5", 0, PB14},
+    {"F1", 0, PA9 }
+};
+
+efuse_t EFUSES[] = {
+  {"E1", 0, PB1, 0, PA7},
+  {"E2", 0, PB0, 0, PA6}
+};
+
+battery_t BATTERIES[] = {
+  {"B1", 0, PA5},
+  {"BF", 0, PA4}
 };
