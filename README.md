@@ -19,14 +19,12 @@ When setting state, pass the new state value as 1 for on and 0 for off. Otherwis
 with two spaces on the right to be 8 characters.  
 *e.g. `S C2 S 0` means "Set channel C2 state to 0", i.e. "turn off channel H2".*   
 *e.g. `G C2 S<Space><Space>` means "Get channel C2 state".*  
-
-`G battery_name V  ` -> Get the voltage (IN TENS OF VOLTS) of the battery with name "battery_name".  
-Pad the command with two spaces on the right to be 8 characters.  
+*e.g.* `G battery_name V  ` -> Get the voltage (IN TENS OF VOLTS) of the battery with name "battery_name".  
 *e.g. `G B1 V<Space><Space>` means "Get battery B1 voltage".*  
 
 ### Response format
 `channel_name/battery_name S/V val` -> The state or voltage of the channel or battery with the matching name is val (an integer).  
-*e.g. `C2 S 1<Space><Space>` means "Channel C2 has state 1", i.e. "Channel C2 is on".*
+*e.g. `C2 S 1<Space><Space>` means "Channel C2 has state 1", i.e. "Channel C2 is on".*  
 *e.g. `B1 V 150` means "Battery B1 is at 15V"*
 
 ### Broadcast format
@@ -37,8 +35,8 @@ This is the format of each message, for logging purposes (only the values are no
 S:C1 C2 C3 C4 C5 CF -> Each state is a 1 character bit
 V:B1 BF -> Each voltage is a 3 character decimal
 ```
-*e.g. `S:100000` means "C1 is on, the rest of the channels are off"  
-*e.g. `V:000100` means "Battery B1 is at 0 volts, battery F1 is at 10 volts"
+*e.g. `S:100000` means "C1 is on, the rest of the channels are off"*  
+*e.g. `V:000100` means "Battery B1 is at 0 volts, battery F1 is at 10 volts"*  
 
 ## Configuration
 Consult the header file `PDC.h` to see/change the `PDC_CAN_ID` and expected `GROUND_CONTROL_CAN_ID`.<br>
