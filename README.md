@@ -1,37 +1,48 @@
 # Rocket Power Distribution Controller Firmware
-Developed for the University of Waikato Astronautics Club on a microcontroller by Elven Aerospace Industries Ltd.  
+Developed for the University of Waikato Astronautics Club on a microcontroller by Elven Aerospace Industries Ltd. & Gareth Reid.
 
 ## Features
-- Turn connected power channels on/off
-- ~~Monitor current drawn by each channel~~
-- ~~Shutdown channels drawing too much current in flight~~
+- Toggle connected power channels on/off
+- Broadcast channel states and battery battery voltages
+- ~~Monitor E-fuse currents and states~~
 
-The latter two features are untested and disabled in the source code because the hardware does not currently support current readings.
+Hardware does not currently support the last feature.
 
 ## CAN bus protocol
-- Exclusively considers frames whose `frame.id` matches `GROUND_CONTROL_CAN_ID`.  
+- For set requests, exclusively considers frames whose `frame.id` matches `GROUND_CONTROL_CAN_ID`.  
 - Expects commands with exactly 8 characters, pad with spaces on the right if needed.  
-- Sends response of exactly 8 characters, padded by spaces on the right if needed.
+- Sends response of exactly 8 characters, padded with zeros in the last value if needed.
 
-### Command format
-`G/S channel_name C/S [1/0]` -> Get or Set the Current or State of the channel with name "channel_name".  
+### Request format
+`G/S channel_name S [1/0]` -> Get or Set the state of the channel with name "channel_name".  
 When setting state, pass the new state value as 1 for on and 0 for off. Otherwise, pad the command
-with spaces on the right to be 8 characters.  
-*e.g. `S H2 S 0` means "Set channel H2 state to 0", i.e. "turn off channel H2".*   
-*e.g. `G H2 S<Space><Space>` means "Get channel H2 state".*  
-Note:  Current cannot be set.  
+with two spaces on the right to be 8 characters.  
+*e.g. `S C2 S 0` means "Set channel C2 state to 0", i.e. "turn off channel H2".*   
+*e.g. `G C2 S<Space><Space>` means "Get channel C2 state".*  
+
+`G battery_name V  ` -> Get the voltage (IN TENS OF VOLTS) of the battery with name "battery_name".  
+Pad the command with two spaces on the right to be 8 characters.  
+*e.g. `G B1 V<Space><Space>` means "Get battery B1 voltage".*  
 
 ### Response format
-`channel_name C/S val` -> The Current or State of the channel with name "channel_name" is val (an integer).  
-*e.g. `H2 S 1<Space><Space>` means "Channel H2 has state 1", i.e. "Channel H2 is on".*
-*e.g. `H2 C 19<Space>` means "Channel H2 is drawing 19A".*
+`channel_name/battery_name S/V val` -> The state or voltage of the channel or battery with the matching name is val (an integer).  
+*e.g. `C2 S 1<Space><Space>` means "Channel C2 has state 1", i.e. "Channel C2 is on".*
+*e.g. `B1 V 150` means "Battery B1 is at 15V"*
 
-~~If an automatic shutdown of a channel drawing too much power occurs, a message is broadcast:~~  
-~~`A channel_name S 0`~~  
+### Broadcast format
+Every 200 milliseconds, the PDC will broadcast 2 8-character frames over the CAN bus, the first reporting the states of the channels,
+and the second reporting the voltages of the connected batteries.  
+This is the format of each message, for logging purposes (only the values are not actually separated by spaces):  
+```
+S:C1 C2 C3 C4 C5 CF -> Each state is a 1 character bit
+V:B1 BF -> Each voltage is a 3 character decimal
+```
+*e.g. `S:100000` means "C1 is on, the rest of the channels are off"  
+*e.g. `V:000100` means "Battery B1 is at 0 volts, battery F1 is at 10 volts"
 
 ## Configuration
 Consult the header file `PDC.h` to see/change the `PDC_CAN_ID` and expected `GROUND_CONTROL_CAN_ID`.<br>
-This header file also defines the channels, their relevant pins and max current values.
+This header file also defines the channels and batteries with their relevant pins.
 
 ## Author
 Alexander Kashpir 
