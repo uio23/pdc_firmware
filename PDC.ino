@@ -114,9 +114,8 @@ handle_request()
   }
   else if (battery != NULL && *method == 'G' && *param == 'V')
   {
-    val = VOLTAGE(analogRead(battery->voltage_pin));
     /* Report voltage in tens of volts */
-    val = val * 10;
+    val = VOLTAGE(analogRead(battery->voltage_pin)) * 10;
   }
   else
   {
@@ -189,10 +188,9 @@ void loop(void)
     int voltage;
     for (int i = 0; i < ARRAY_SIZE(BATTERIES); i++)
     {
-      /* Each voltage added as a string in the range of 000 - 999 */
-      voltage = VOLTAGE(analogRead(BATTERIES[i].voltage_pin));
       /* Report voltage in tens of volts */
-      voltage = voltage * 10;
+      /* Each voltage added as a string in the range of 000 - 999 representing 00.0V - 99.9V*/
+      voltage = VOLTAGE(analogRead(BATTERIES[i].voltage_pin)) * 10;
       tx_string[i * 3 + 2] = '0' + (voltage / 100) % 10;
       tx_string[i * 3 + 3] = '0' + (voltage / 10 ) % 10;
       tx_string[i * 3 + 4] = '0' + (voltage      ) % 10;
