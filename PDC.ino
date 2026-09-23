@@ -158,6 +158,10 @@ handle_request()
     /* Report voltage in tens of volts */
     val = VOLTAGE(analogRead(battery->voltage_pin)) * 10;
   }
+  else
+  {
+    return false;
+  }
 
   snprintf(tx_string, sizeof(tx_string), "%s %c %03d", name, *param, val); 
   return true;
