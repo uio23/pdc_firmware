@@ -1,6 +1,6 @@
 /*
  * PDC.h - Power Distribution Controller Firmware for
- *         monitoring and controlling onboard power channels.
+ *         controlling onboard power channels and monitoring voltages.
  * Created by Alexander Kashpir,
  * for the Univeristy of Waikato Aeronautics Club,
  * on a microcontroller by Elven Aerospace Industrices Ltd and Gareth Reid.
@@ -12,14 +12,17 @@
 #pragma once
 
 
+#define USER_LED PC13
+
 #define PDC_CAN_ID            (0xDC) /* For (P)DC */
 #define GROUND_CONTROL_CAN_ID (0x01)
 #define SPI_CS_PIN            (PA0)
 
-#define BROADCAST_INTERVAL    (200000) /* 200 milliseconds in microseconds */
+#define BROADCAST_INTERVAL    (250000) /* 250 milliseconds in microseconds */
 
+#define ADC_RES               (12)
 #define ADC_MAX               (4095)
-#define VOLTAGE(x)            (( (float)x / ADC_MAX ) * 18.3f)
+#define VOLTAGE(x)            ( (x * 18.3f) / ADC_MAX)
 
 #define ARRAY_SIZE(x)         (sizeof(x) / sizeof((x)[0]))
 
