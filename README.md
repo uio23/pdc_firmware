@@ -13,16 +13,17 @@ Hardware does not currently support the last feature.
 - Responses are always 8 characters long, numbers may be left-padded with 0s to achieve this.  
 
 ### Request format
-`G/S channel_name/battery_name S/V [1/0]` -> Get or Set the state or voltage of the channel or battery with a matching name.  
-When setting state, pass the new state value as 1 for on and 0 for off.
-*e.g. `G C2 S` means "Get channel C2 state".*  
-*e.g. `S C2 S 0` means "Set channel C2 state to 0", i.e. "turn off channel H2".*   
-*e.g.* `G B1 V` means "Get battery B1 voltage".
+`channel_name/battery_name S/V [val]` -> Get or Set the state of a channel, get the voltage of a battery or set the voltage percentage adjustment.  
+When setting state, pass `val` to 1 for on and 0 for off. When setting voltage percentage, the format is vvv for vv.v% .  
+*e.g. `C2 S` means "Get channel C2 state".*  
+*e.g. `C2 S 0` means "Set channel C2 state to 0", i.e. "turn off channel H2".*   
+*e.g. `B1 V` means "Get battery B1 voltage".*
+*e.g. `B1 V 789` means "Scale the voltage sense of B1 to 78.9%".*
 
 ### Response format
-`channel_name/battery_name S/V val` -> The state or voltage of the channel or battery with the matching name is val (an integer).  
+`channel_name/battery_name S/V val` -> The state or voltage or voltage percentage of the channel or battery with the matching name is val (an integer).  
 *e.g. `C2 S 1` means "Channel C2 has state 1", i.e. "Channel C2 is on".*  
-*e.g. `B1 V 152` means "Battery B1 is at 15.2V"*
+*e.g. `B1 V 152` means "Battery B1 is at 15.2V OR Battery B1 voltage is scaled 15.2%"*
 
 ### Broadcast format
 Every 250 milliseconds, the PDC will broadcast 2 8-character frames over the CAN bus, the first reporting the states of the channels,

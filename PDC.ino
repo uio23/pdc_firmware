@@ -116,15 +116,15 @@ handle_request()
   channel_t *channel;
   battery_t *battery;
 
-  char *method  = strtok(rx_string, " ");
-  char *name    = strtok(NULL, " ");
+  char *name    = strtok(rx_string, " ");
   char *param   = strtok(NULL, " ");
   char *str_val = strtok(NULL, " ");
-  int val       = (str_val == NULL) ? -1 : atoi(str_val);
+  bool setting  = (str_val != NULL);
+  int  val      = (setting) ? atoi(str_val) : -1;
 
   /* --- Validate --- */
-  /* If missing any of 3 essential parameters, drop */
-  if (method == NULL || name == NULL || param == NULL) return false;
+  /* If missing any of 2 essential parameters, drop */
+  if (name == NULL || param == NULL) return false;
 
   channel = get_channel(name);
   battery = get_battery(name);
@@ -133,31 +133,39 @@ handle_request()
   if (*param == 'S' && channel == NULL) return false;
   if (*param == 'V' && battery == NULL) return false;
 
+  if (str_val != NULL) setting = true;
+
   /* If set request not from ground control, drop */
-  if (*method == 'S' && rx.can_id != GROUND_CONTROL_CAN_ID) return false;
+  if (setting && rx.can_id != GROUND_CONTROL_CAN_ID) return false;
 
   /* If set request does not contain integer, drop */
-  if (*method == 'S' && str_val == NULL) return false;
-  if (*method == 'S' && *str_val != '0' && val == 0) return false;
+  if (setting && *str_val != '0' && val == 0) return false;
 
   /* --- Parse --- */
   if
-    (channel != NULL && *method == 'G' && *param == 'S')
+    (channel != NULL && !setting && *param == 'S')
   {
     val = digitalRead(channel->state_pin);
   }
   else if
-    (channel != NULL && *method == 'S' && *param == 'S')
+    (channel != NULL && setting && *param == 'S')
   {
       /* If new state is not 0 or 1, drop */
       if (val != 0 && val != 1) return false;
       digitalWrite(channel->state_pin, val);
   }
   else if
-    (battery != NULL && *method == 'G' && *param == 'V')
+    (battery != NULL && !setting && *param == 'V')
   {
     /* Report voltage in tens of volts */
-    val = VOLTAGE(analogRead(battery->voltage_pin)) * 10;
+    val = VOLTAGE(analogRead(battery->voltage_pin)) * battery->voltage_perc * 10;
+  }
+  else if
+    (battery != NULL && setting && *param == 'V')
+  {
+    /* Set voltage adjustment percentage */
+    if (val < 0 || val > 999) return false;
+    battery->voltage_perc = (float)val / 1000;
   }
   else
   {
@@ -184,10 +192,11 @@ setup(void)
 
   /* TODO: When E-Fuses are supported by hardware, include them */
 
-  /* Set each battery voltage pin to input */
+  /* Set each battery voltage pin to input and full voltage percentage */
   for (int i = 0; i < ARRAY_SIZE(BATTERIES); i++)
   {
     pinMode(BATTERIES[i].voltage_pin, INPUT);
+    BATTERIES[i].voltage_perc = 1.0;
   }
 
   /* Set-up CAN peripheral */
@@ -255,7 +264,7 @@ loop(void)
 
       /* Report voltage in tens of volts */
       /* Each voltage added as a string in the range of 000 - 999 representing 00.0V - 99.9V*/
-      voltage = VOLTAGE(analogRead(BATTERIES[i].voltage_pin)) * 10;
+      voltage = VOLTAGE(analogRead(BATTERIES[i].voltage_pin)) * BATTERIES[i].voltage_perc * 10;
       tx_string[i * 3 + 2] = '0' + (voltage / 100) % 10;
       tx_string[i * 3 + 3] = '0' + (voltage / 10 ) % 10;
       tx_string[i * 3 + 4] = '0' + (voltage      ) % 10;

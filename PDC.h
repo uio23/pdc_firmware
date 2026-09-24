@@ -58,6 +58,7 @@ typedef struct battery_t {
 
     float voltage;
     uint32_t voltage_pin;
+    float voltage_perc;
 } battery_t;
 
 
@@ -76,6 +77,6 @@ efuse_t EFUSES[] = {
 };
 
 battery_t BATTERIES[] = {
-  {"B1", 0, PA5},
-  {"BF", 0, PA4}
+  {"B1", 0, PA5, 1},
+  {"BF", 0, PA4, 1}
 };
