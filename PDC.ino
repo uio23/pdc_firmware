@@ -120,7 +120,7 @@ handle_request()
   char *name    = strtok(NULL, " ");
   char *param   = strtok(NULL, " ");
   char *str_val = strtok(NULL, " ");
-  int  val      = atoi(str_val);
+  int val       = (str_val == NULL) ? -1 : atoi(str_val);
 
   /* --- Validate --- */
   /* If missing any of 3 essential parameters, drop */
@@ -137,6 +137,7 @@ handle_request()
   if (*method == 'S' && rx.can_id != GROUND_CONTROL_CAN_ID) return false;
 
   /* If set request does not contain integer, drop */
+  if (*method == 'S' && str_val == NULL) return false;
   if (*method == 'S' && *str_val != '0' && val == 0) return false;
 
   /* --- Parse --- */
@@ -163,7 +164,7 @@ handle_request()
     return false;
   }
 
-  snprintf(tx_string, sizeof(tx_string), "%s %c %03d", name, *param, val); 
+  snprintf(tx_string, sizeof(tx_string), "%s %c %03d", name, *param, val);
   return true;
 }
 
