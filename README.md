@@ -3,20 +3,20 @@ Developed for the University of Waikato Astronautics Club on a microcontroller b
 
 ## Features
 - Toggle connected power channels on/off
-- Broadcast channel states and battery battery voltages
+- Broadcast channel states and battery voltages
 - ~~Monitor E-fuse currents and states~~
 
 Hardware does not currently support the last feature.
 
 ## CAN bus protocol
 - For set requests, exclusively considers frames whose `frame.id` matches `GROUND_CONTROL_CAN_ID`.  
+- Responses are always 8 characters long, numbers may be left-padded with 0s to achieve this.  
 
 ### Request format
-`G/S channel_name S [1/0]` -> Get or Set the state of the channel with name "channel_name".  
+`G/S channel_name/battery_name S/V [1/0]` -> Get or Set the state or voltage of the channel or battery with a matching name.  
 When setting state, pass the new state value as 1 for on and 0 for off.
-*e.g. `S C2 S 0` means "Set channel C2 state to 0", i.e. "turn off channel H2".*   
 *e.g. `G C2 S` means "Get channel C2 state".*  
-*e.g.* `G battery_name V` -> Get the voltage (IN TENS OF VOLTS) of the battery with name "battery_name".  
+*e.g. `S C2 S 0` means "Set channel C2 state to 0", i.e. "turn off channel H2".*   
 *e.g.* `G B1 V` means "Get battery B1 voltage".
 
 ### Response format
@@ -29,15 +29,15 @@ Every 250 milliseconds, the PDC will broadcast 2 8-character frames over the CAN
 and the second reporting the voltages of the connected batteries.  
 This is the format of each message, for logging purposes (only the values are not actually separated by spaces):  
 ```
-S:C1 C2 C3 C4 C5 CF -> Each state is a 1 character bit
+S:C1 C2 C3 C4 C5 F1 -> Each state is a 1 character bit
 V:B1 BF -> Each voltage is a 3 character decimal
 ```
 *e.g. `S:100000` means "C1 is on, the rest of the channels are off"*  
-*e.g. `V:000100` means "Battery B1 is at 0 volts, battery F1 is at 10 volts"*  
+*e.g. `V:000100` means "Battery B1 is at 0 volts, battery BF is at 10.0 volts"*  
 
 ## Configuration
-Consult the header file `PDC.h` to see/change the `PDC_CAN_ID` and expected `GROUND_CONTROL_CAN_ID`.<br>
-This header file also defines the broadcast frequency, and channels and batteries with their relevant pins.
+Consult the header file `PDC.h` to see/change the `PDC_CAN_ID` and expected `GROUND_CONTROL_CAN_ID`.  
+This header file also defines the broadcast frequency (time), and the channels and batteries with their relevant pins.
 
 ## Author
 Alexander Kashpir 
