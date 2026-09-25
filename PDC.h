@@ -12,19 +12,23 @@
 #pragma once
 
 
-#define USER_LED PC13
+/* The voltage percentage adjustments are initialised to these */
+#define B1_PERC (1.00)
+#define BF_PERC (1.00)
+
+#define ADC_RES    (12)
+#define ADC_MAX    (4095)
+#define VOLTAGE(x) ( (x * 18.3f) / ADC_MAX)
 
 #define PDC_CAN_ID            (0xDC) /* For (P)DC */
 #define GROUND_CONTROL_CAN_ID (0x01)
 #define SPI_CS_PIN            (PA0)
 
-#define BROADCAST_INTERVAL    (250000) /* 250 milliseconds in microseconds */
+#define BROADCAST_INTERVAL (250000) /* 250 milliseconds in microseconds */
 
-#define ADC_RES               (12)
-#define ADC_MAX               (4095)
-#define VOLTAGE(x)            ( (x * 18.3f) / ADC_MAX)
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-#define ARRAY_SIZE(x)         (sizeof(x) / sizeof((x)[0]))
+#define USER_LED PC13
 
 
 /**
@@ -33,7 +37,6 @@
 typedef struct channel_t {
   char name[3];
 
-  int state;
   uint32_t state_pin;
 } channel_t;
 
@@ -43,10 +46,8 @@ typedef struct channel_t {
 typedef struct efuse_t {
   char name[3];
 
-  float current;
   uint32_t current_pin;
 
-  int state;
   uint32_t state_pin;
 } efuse_t;
 
@@ -56,27 +57,26 @@ typedef struct efuse_t {
 typedef struct battery_t {
     char name[3];
 
-    float voltage;
     uint32_t voltage_pin;
-    float voltage_perc;
+    float    voltage_perc;
 } battery_t;
 
 
 channel_t CHANNELS[] = {
-    {"C1", 0, PB3 },
-    {"C2", 0, PA15},
-    {"C3", 0, PA10},
-    {"C4", 0, PA8 },
-    {"C5", 0, PB14},
-    {"F1", 0, PA9 }
+    {"C1", PB3 },
+    {"C2", PA15},
+    {"C3", PA10},
+    {"C4", PA8 },
+    {"C5", PB14},
+    {"F1", PA9 }
 };
 
 efuse_t EFUSES[] = {
-  {"E1", 0, PB1, 0, PA7},
-  {"E2", 0, PB0, 0, PA6}
+  {"E1", PB1, PA7},
+  {"E2", PB0, PA6}
 };
 
 battery_t BATTERIES[] = {
-  {"B1", 0, PA5, 1},
-  {"BF", 0, PA4, 1}
+  {"B1", PA5, B1_PERC},
+  {"BF", PA4, BF_PERC}
 };

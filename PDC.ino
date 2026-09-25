@@ -163,9 +163,9 @@ handle_request()
   else if
     (battery != NULL && setting && *param == 'V')
   {
-    /* Set voltage adjustment percentage */
+    /* Set voltage adjustment percentage between 0% and 999% */
     if (val < 0 || val > 999) return false;
-    battery->voltage_perc = (float)val / 1000;
+    battery->voltage_perc = (float)val / 100;
   }
   else
   {
@@ -192,11 +192,10 @@ setup(void)
 
   /* TODO: When E-Fuses are supported by hardware, include them */
 
-  /* Set each battery voltage pin to input and full voltage percentage */
+  /* Set each battery voltage pin to input */
   for (int i = 0; i < ARRAY_SIZE(BATTERIES); i++)
   {
     pinMode(BATTERIES[i].voltage_pin, INPUT);
-    BATTERIES[i].voltage_perc = 1.0;
   }
 
   /* Set-up CAN peripheral */
